@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Svetlá</title>
+<style>
+:root{--bg:#ece8e0;--ink:#22303a;--muted:#5d6b75;--off:#c9c2b4;--on:#1f7a6d;--btn:#22303a;--btnink:#ece8e0;color-scheme:light;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141b21;--ink:#e9ece8;--muted:#98a5ae;--off:#2a353d;--on:#3fc7b0;--btn:#e9ece8;--btnink:#141b21;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#141b21;--ink:#e9ece8;--muted:#98a5ae;--off:#2a353d;--on:#3fc7b0;--btn:#e9ece8;--btnink:#141b21;color-scheme:dark}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Georgia,"Times New Roman",serif}
+body{min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:14px;padding:20px 16px}
+h1{margin:0;font-size:30px}
+.info{text-align:center;color:var(--muted);font-size:16px;line-height:1.4}
+.info b{color:var(--ink)}
+#board{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;width:100%;max-width:340px}
+.c{aspect-ratio:1;border:0;border-radius:12px;background:var(--off);cursor:pointer;transition:background .2s,transform .1s;padding:0}
+.c.on{background:var(--on)}
+.c:active{transform:scale(.94)}
+.c:focus-visible,button:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+.row{display:flex;gap:10px}
+button.b{font:inherit;border:0;border-radius:8px;background:var(--btn);color:var(--btnink);padding:11px 20px;cursor:pointer}
+button.b:disabled{opacity:.4;cursor:default}
+#win{min-height:52px;text-align:center;font-size:18px}
+</style>
+</head>
+<body>
+<h1>Svetlá</h1>
+<div class="info">Úroveň <b id="lv">1</b> · Ťahy <b id="mv">0</b> z <b id="par">0</b><br>Tvar ťahu: <b id="pn"></b></div>
+<div id="board" role="group" aria-label="Hracia plocha"></div>
+<div id="win" aria-live="polite"></div>
+<div class="row">
+<button class="b" id="undo">Späť</button>
+<button class="b" id="reset">Znova</button>
+</div>
+<p class="info" style="margin:0;max-width:340px">Rozsviet všetky políčka. Každý ťah prepne políčka v tvare, ktorý sa mení s úrovňou.</p>
+<script>
+(function(){
+var N=5,lv=1,g,hist,mv,par,pat,board=document.getElementById('board'),cells=[];
+var P=[
+{n:'plus',f:function(r,c){return[[r,c],[r-1,c],[r+1,c],[r,c-1],[r,c+1]]}},
+{n:'kríž',f:function(r,c){return[[r,c],[r-1,c-1],[r-1,c+1],[r+1,c-1],[r+1,c+1]]}},
+{n:'štvorec',f:function(r,c){return[[r,c],[r+1,c],[r,c+1],[r+1,c+1]]}},
+{n:'riadok a stĺpec',f:function(r,c){var a=[],i;for(i=0;i<N;i++){a.push([r,i]);if(i!=r)a.push([i,c])}return a}}
+];
+var $=function(i){return document.getElementById(i)};
+function press(a,r,c){pat.f(r,c).forEach(function(p){if(p[0]>=0&&p[1]>=0&&p[0]<N&&p[1]<N)a[p[0]*N+p[1]]=!a[p[0]*N+p[1]]})}
+function solved(){return g.every(Boolean)}
+function newLevel(){
+pat=P[(lv-1)%4];par=Math.min(2+lv,12);
+do{g=[];for(var i=0;i<N*N;i++)g.push(true);
+var ids=[];for(i=0;i<N*N;i++)ids.push(i);
+for(i=0;i<par;i++){var j=i+Math.floor(Math.random()*(ids.length-i)),t=ids[i];ids[i]=ids[j];ids[j]=t;press(g,Math.floor(ids[i]/N),ids[i]%N)}
+}while(solved());
+start=g.slice();reset()}
+var start;
+function reset(){g=start.slice();hist=[];mv=0;$('win').innerHTML='';render()}
+function render(){
+$('lv').textContent=lv;$('mv').textContent=mv;$('par').textContent=par;$('pn').textContent=pat.n;
+cells.forEach(function(b,i){b.className='c'+(g[i]?' on':'');b.setAttribute('aria-label','Políčko '+(Math.floor(i/N)+1)+','+(i%N+1)+(g[i]?', svieti':', nesvieti'))});
+$('undo').disabled=!hist.length}
+function tap(i){
+if(solved())return;
+hist.push(g.slice());press(g,Math.floor(i/N),i%N);mv++;render();
+if(solved()){
+var w=$('win');
+w.innerHTML=(mv<=par?'Výborne, si v limite ťahov.':'Hotovo.')+'<br>';
+var nb=document.createElement('button');nb.className='b';nb.textContent='Ďalšia úroveň';nb.style.marginTop='8px';
+nb.onclick=function(){lv++;newLevel()};
+var sb=document.createElement('button');sb.className='b';sb.textContent='Zdieľať výsledok';sb.style.cssText='margin:8px 0 0 8px';sb.onclick=function(){share(sb)};
+w.appendChild(nb);w.appendChild(sb);nb.focus()}}
+for(var i=0;i<N*N;i++){(function(i){var b=document.createElement('button');b.onclick=function(){tap(i)};board.appendChild(b);cells.push(b)})(i)}
+$('undo').onclick=function(){if(hist.length&&!solved()){g=hist.pop();mv--;render()}};
+$('reset').onclick=reset;
+function share(btn){
+var txt='Svetlá: úroveň '+lv+' na '+mv+' ťahov (limit '+par+') 💡 '+location.href;
+function manual(){var p=document.createElement('p');p.style.cssText='user-select:all;margin:10px 0 0;font-size:15px';p.textContent=txt;$('win').appendChild(p);btn.textContent='Skopíruj text nižšie'}
+try{
+if(navigator.share){navigator.share({text:txt}).catch(function(){})}
+else if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(function(){btn.textContent='Skopírované'},manual)}
+else manual()
+}catch(e){manual()}}
+newLevel();
+})();
+</script>
+</body>
+</html>
